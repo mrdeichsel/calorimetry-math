@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calorimetry Practice Master</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <!-- React 18 & Babel Standalone -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Custom sleek dark scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.25s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 antialiased min-h-screen flex flex-col selection:bg-amber-500 selection:text-slate-950">
+  <div id="root" class="min-h-screen flex flex-col"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Standard materials & specific heat values (J / (g * unit))
+    const MATERIALS = [
+      { name: "Water", c: 4.18 },
+      { name: "Aluminum", c: 0.897 },
+      { name: "Iron", c: 0.449 },
+      { name: "Copper", c: 0.385 },
+      { name: "Gold", c: 0.129 },
+      { name: "Ethanol", c: 2.44 },
+      { name: "Glass", c: 0.840 },
+      { name: "Granite", c: 0.790 }
+    ];
+
+    const toSigFigs = (val, sig = 3) => {
+      if (val === null || val === undefined || isNaN(val) || !isFinite(val)) return val;
+      return Number(Number(val).toPrecision(sig));
+    };
+
+    const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    const randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+    // Generates a calorimetry problem solving for E, m, c, ΔT, or T_f
+    const generateProblem = () => {
+      const type = randomChoice(['solve_E', 'solve_m', 'solve_c', 'solve_deltaT', 'solve_Tf']);
+      const tempUnit = randomChoice(['°C', 'K']);
+      const mat = randomChoice(MATERIALS);
+
+      let mass = toSigFigs(randomInt(15, 450), 3); // in grams
+      let cVal = toSigFigs(mat.c, 3); // J / (g * tempUnit)
+
+      // Base temperatures in consistent unit
+      let tInitial = tempUnit === '°C' ? toSigFigs(randomInt(15, 35), 3) : toSigFigs(randomInt(288, 308), 3);
+      let deltaT = toSigFigs(randomInt(12, 65), 3);
+      let tFinal = toSigFigs(tInitial + deltaT, 3);
+
+      // E = m * c * deltaT (in Joules)
+      let rawE = mass * cVal * deltaT;
+      let energyJ = toSigFigs(rawE, 3);
+
+      let target = '';
+      let expectedAnswer = 0;
+      let targetUnit = '';
+      let text = '';
+      let givens = [];
+      let cUnit = `J/(g·${tempUnit})`;
+
+      if (type === 'solve_E') {
+        target = 'E';
+        expectedAnswer = energyJ;
+        targetUnit = 'J';
+        text = `A ${mass} g sample of ${mat.name} (c = ${cVal} ${cUnit}) absorbs heat, raising its temperature from ${tInitial} ${tempUnit} to ${tFinal} ${tempUnit}. Calculate the energy E absorbed in Joules.`;
+        givens = [
+          { id: 'm', label: `${mass} g`, correctVar: 'm' },
+          { id: 'c', label: `${cVal} ${cUnit}`, correctVar: 'c' },
+          { id: 'Ti', label: `${tInitial} ${tempUnit}`, correctVar: 'T_i' },
+          { id: 'Tf', label: `${tFinal} ${tempUnit}`, correctVar: 'T_f' }
+        ];
+      } else if (type === 'solve_m') {
+        target = 'm';
+        expectedAnswer = mass;
+        targetUnit = 'g';
+        text = `An unknown mass m of ${mat.name} (c = ${cVal} ${cUnit}) absorbs ${energyJ} J of energy, resulting in a temperature change ΔT of ${deltaT} ${tempUnit}. Calculate the mass of the sample in grams.`;
+        givens = [
+          { id: 'E', label: `${energyJ} J`, correctVar: 'E' },
+          { id: 'c', label: `${cVal} ${cUnit}`, correctVar: 'c' },
+          { id: 'dT', label: `${deltaT} ${tempUnit}`, correctVar: 'ΔT' }
+        ];
+      } else if (type === 'solve_c') {
+        target = 'c';
+        expectedAnswer = cVal;
+        targetUnit = cUnit;
+        text = `A ${mass} g sample of an unknown substance absorbs ${energyJ} J of energy E as its temperature increases by ${deltaT} ${tempUnit}. Calculate the specific heat capacity c of the substance in ${cUnit}.`;
+        givens = [
+          { id: 'E', label: `${energyJ} J`, correctVar: 'E' },
+          { id: 'm', label: `${mass} g`, correctVar: 'm' },
+          { id: 'dT', label: `${deltaT} ${tempUnit}`, correctVar: 'ΔT' }
+        ];
+      } else if (type === 'solve_deltaT') {
+        target = 'ΔT';
+        expectedAnswer = deltaT;
+        targetUnit = tempUnit;
+        text = `A ${mass} g sample of ${mat.name} (c = ${cVal} ${cUnit}) absorbs ${energyJ} J of energy E. Calculate the overall change in temperature ΔT in ${tempUnit}.`;
+        givens = [
+          { id: 'E', label: `${energyJ} J`, correctVar: 'E' },
+          { id: 'm', label: `${mass} g`, correctVar: 'm' },
+          { id: 'c', label: `${cVal} ${cUnit}`, correctVar: 'c' }
+        ];
+      } else if (type === 'solve_Tf') {
+        target = 'T_f';
+        expectedAnswer = tFinal;
+        targetUnit = tempUnit;
+        text = `A ${mass} g sample of ${mat.name} (c = ${cVal} ${cUnit}) has an initial temperature T_i of ${tInitial} ${tempUnit}. If it absorbs ${energyJ} J of heat energy E, calculate the final temperature T_f in ${tempUnit}.`;
+        givens = [
+          { id: 'E', label: `${energyJ} J`, correctVar: 'E' },
+          { id: 'm', label: `${mass} g`, correctVar: 'm' },
+          { id: 'c', label: `${cVal} ${cUnit}`, correctVar: 'c' },
+          { id: 'Ti', label: `${tInitial} ${tempUnit}`, correctVar: 'T_i' }
+        ];
+      }
+
+      const shuffledGivens = [...givens].sort(() => Math.random() - 0.5);
+
+      return {
+        id: Date.now(),
+        type,
+        text,
+        tempUnit,
+        cUnit,
+        target,
+        expectedAnswer,
+        targetUnit,
+        energyJ,
+        mass,
+        cVal,
+        tInitial,
+        tFinal,
+        deltaT,
+        givens: shuffledGivens
+      };
+    };
+
+    // SVG Icon Component
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const icons = {
+        Flame: (
+          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+        ),
+        Sparkles: (
+          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+        ),
+        Award: (
+          <g>
+            <circle cx="12" cy="8" r="6" />
+            <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" />
+          </g>
+        ),
+        BookOpen: (
+          <g>
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+          </g>
+        ),
+        Calculator: (
+          <g>
+            <rect width="16" height="20" x="4" y="2" rx="2" />
+            <line x1="8" x2="16" y1="6" y2="6" />
+            <line x1="16" x2="16" y1="14" y2="18" />
+            <path d="M16 10h.01" />
+            <path d="M12 10h.01" />
+            <path d="M8 10h.01" />
+            <path d="M12 14h.01" />
+            <path d="M8 14h.01" />
+            <path d="M12 18h.01" />
+            <path d="M8 18h.01" />
+          </g>
+        ),
+        RefreshCw: (
+          <g>
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+            <path d="M8 16H3v5" />
+          </g>
+        ),
+        Info: (
+          <g>
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4" />
+            <path d="M12 8h.01" />
+          </g>
+        ),
+        Tag: (
+          <g>
+            <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+            <line x1="7" x2="7.01" y1="7" y2="7" />
+          </g>
+        ),
+        Zap: (
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        ),
+        ArrowRight: (
+          <g>
+            <path d="M5 12h14" />
+            <path d="m12 5 7 7-7 7" />
+          </g>
+        ),
+        CheckCircle2: (
+          <g>
+            <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+            <path d="m9 12 2 2 4-4" />
+          </g>
+        ),
+        XCircle: (
+          <g>
+            <circle cx="12" cy="12" r="10" />
+            <path d="m15 9-6 6" />
+            <path d="m9 9 6 6" />
+          </g>
+        ),
+        ChevronRight: (
+          <path d="m9 18 6-6-6-6" />
+        ),
+        Check: (
+          <path d="M20 6 9 17l-5-5" />
+        ),
+        Thermometer: (
+          <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z" />
+        ),
+        X: (
+          <g>
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </g>
+        )
+      };
+
+      return (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          {icons[name] || null}
+        </svg>
+      );
+    };
+
+    // Fraction layout helper for formulas
+    const FractionExpr = ({ lhs, num, den, className = "" }) => {
+      if (!den) {
+        return (
+          <div className={`inline-flex items-center gap-2 font-mono font-bold ${className}`}>
+            {lhs && <span><FormattedText text={lhs} /> =</span>}
+            <span><FormattedText text={num} /></span>
+          </div>
+        );
+      }
+
+      return (
+        <div className={`inline-flex items-center gap-3 font-mono font-bold ${className}`}>
+          {lhs && <span><FormattedText text={lhs} /> =</span>}
+          <div className="inline-flex flex-col items-center justify-center text-center">
+            <span className="px-2 py-1 border-b-2 border-current w-full text-center leading-none"><FormattedText text={num} /></span>
+            <span className="px-2 py-1 text-center leading-none"><FormattedText text={den} /></span>
+          </div>
+        </div>
+      );
+    };
+
+    // Helper to format text with proper subscript tags for T_i and T_f
+    const FormattedText = ({ text }) => {
+      if (text === null || text === undefined) return null;
+      if (typeof text !== 'string') return <span>{text}</span>;
+      const parts = text.split(/(T_i|T_f)/g);
+      return (
+        <span>
+          {parts.map((part, idx) => {
+            if (part === 'T_i') return <span key={idx}>T<sub>i</sub></span>;
+            if (part === 'T_f') return <span key={idx}>T<sub>f</sub></span>;
+            return part;
+          })}
+        </span>
+      );
+    };
+
+    function App() {
+      // Always default to 'problem' (Direct Answer mode)
+      const [appMode, setAppMode] = useState('problem');
+      const [problem, setProblem] = useState(null);
+      const [currentStep, setCurrentStep] = useState(1);
+      const [autoRedirectMessage, setAutoRedirectMessage] = useState(false);
+      
+      // Step 1 State: Givens & Target Mapping
+      const [userAssignments, setUserAssignments] = useState({}); 
+      const [userTargetVar, setUserTargetVar] = useState('');
+      const [step1Error, setStep1Error] = useState('');
+
+      // Step 2 State: Formula Selection
+      const [selectedFormula, setSelectedFormula] = useState('');
+      const [step2Error, setStep2Error] = useState('');
+
+      // Step 3 & 4 State: Answer Checking
+      const [userAnswer, setUserAnswer] = useState('');
+      const [answerResult, setAnswerResult] = useState(null);
+
+      // Stats & Modals
+      const [score, setScore] = useState(0);
+      const [streak, setStreak] = useState(0);
+      const [completedCount, setCompletedCount] = useState(0);
+      const [showReference, setShowReference] = useState(false);
+      const [showCalculator, setShowCalculator] = useState(false);
+
+      // Scratchpad State
+      const [calcMass, setCalcMass] = useState('');
+      const [calcC, setCalcC] = useState('');
+      const [calcDT, setCalcDT] = useState('');
+      const [calcE, setCalcE] = useState('');
+
+      useEffect(() => {
+        loadNewProblem();
+      }, []);
+
+      const loadNewProblem = () => {
+        const newProb = generateProblem();
+        setProblem(newProb);
+        setAppMode('problem'); // Default to direct answer
+        setCurrentStep(1);
+        setUserAssignments({});
+        setUserTargetVar('');
+        setStep1Error('');
+        setSelectedFormula('');
+        setStep2Error('');
+        setUserAnswer('');
+        setAnswerResult(null);
+        setAutoRedirectMessage(false);
+      };
+
+      if (!problem) return null;
+
+      // Available variable tags for step 1 mapping
+      const ALL_VARS = ['E', 'm', 'c', 'ΔT', 'T_i', 'T_f'];
+
+      // Isolated formulas based on target variable
+      const getIsolatedFormulaParts = (targetVar) => {
+        const parts = {
+          E: { num: "m × c × ΔT", den: "" },
+          m: { num: "E", den: "c × ΔT" },
+          c: { num: "E", den: "m × ΔT" },
+          "ΔT": { num: "E", den: "m × c" },
+          "T_f": { num: "T_i + (E / (m × c))", den: "" }
+        };
+        return parts[targetVar] || { num: "", den: "" };
+      };
+
+      // Step 1 Verification
+      const handleVerifyStep1 = () => {
+        setStep1Error('');
+
+        for (const item of problem.givens) {
+          if (!userAssignments[item.id]) {
+            setStep1Error(`Please select a variable tag (E, m, c, ΔT, T_i, T_f) for "${item.label}".`);
+            return;
+          }
+          if (userAssignments[item.id] !== item.correctVar) {
+            setStep1Error(`Incorrect variable assignment for "${item.label}". Double-check units (J=E, g=m, J/(g·°C)=c, etc.).`);
+            return;
+          }
+        }
+
+        if (!userTargetVar) {
+          setStep1Error(`Please select the unknown target variable you are solving for.`);
+          return;
+        }
+
+        if (userTargetVar !== problem.target) {
+          setStep1Error(`Target variable mismatch! The question asks for ${problem.targetUnit}, corresponding to '${problem.target}'.`);
+          return;
+        }
+
+        setCurrentStep(2);
+      };
+
+      // Step 2 Verification
+      const handleVerifyStep2 = () => {
+        setStep2Error('');
+        if (!selectedFormula) {
+          setStep2Error(`Please select the equation formula to proceed.`);
+          return;
+        }
+        if (selectedFormula !== problem.target) {
+          setStep2Error(`Select the formula rearranged for target '${problem.target}'.`);
+          return;
+        }
+        setCurrentStep(3);
+      };
+
+      // Step 3 proceed to Step 4
+      const handleConfirmStep3 = () => {
+        setCurrentStep(4);
+      };
+
+      // Verify numerical answer (Direct & Step 4)
+      const handleVerifyAnswer = () => {
+        const numericAns = parseFloat(userAnswer);
+        if (isNaN(numericAns)) {
+          setAnswerResult({ correct: false, msg: 'Please enter a valid numeric value.' });
+          return;
+        }
+
+        const expected = toSigFigs(problem.expectedAnswer, 3);
+        const userSig = toSigFigs(numericAns, 3);
+        const tolerance = Math.abs(expected * 0.035); // 3.5% tolerance
+        const isCorrect = Math.abs(numericAns - expected) <= Math.max(tolerance, 0.05) || userSig === expected;
+
+        if (isCorrect) {
+          setAnswerResult({
+            correct: true,
+            msg: `🎉 Excellent work! Your answer (${userSig} ${problem.targetUnit}) is correct (to 3 sig figs)!`
+          });
+          setScore(prev => prev + (appMode === 'problem' ? 150 : 100) + streak * 10);
+          setStreak(prev => prev + 1);
+          setCompletedCount(prev => prev + 1);
+        } else {
+          setStreak(0);
+          setAnswerResult({
+            correct: false,
+            msg: `Incorrect calculation. Expected answer (to 3 sig figs) is ${expected} ${problem.targetUnit}.`
+          });
+        }
+      };
+
+      const activeTarget = userTargetVar || problem.target;
+      const isolatedParts = getIsolatedFormulaParts(activeTarget);
+
+      const getValForVar = (v) => {
+        if (v === activeTarget) return '?';
+        if (v === 'E') return `${problem.energyJ} J`;
+        if (v === 'm') return `${problem.mass} g`;
+        if (v === 'c') return `${problem.cVal}`;
+        if (v === 'ΔT') return `${problem.deltaT} ${problem.tempUnit}`;
+        if (v === 'T_i') return `${problem.tInitial} ${problem.tempUnit}`;
+        if (v === 'T_f') return `${problem.tFinal} ${problem.tempUnit}`;
+        return v;
+      };
+
+      return (
+        <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
+          
+          {/* HEADER NAVBAR */}
+          <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-30 px-4 py-3 sm:px-8 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center space-x-3">
+              <div className="bg-gradient-to-tr from-amber-500 to-orange-500 p-2.5 rounded-xl shadow-lg shadow-amber-500/20">
+                <Icon name="Flame" className="w-6 h-6 text-slate-950" />
+              </div>
+              <div>
+                <h1 className="font-bold text-lg sm:text-xl bg-gradient-to-r from-white via-slate-200 to-amber-200 bg-clip-text text-transparent">
+                  Calorimetry Practice Master (E = m·c·ΔT)
+                </h1>
+                <p className="text-xs text-slate-400">Step-by-Step Heat Energy & Temperature Solver</p>
+              </div>
+            </div>
+
+            {/* STATS & QUICK TOOLS */}
+            <div className="flex items-center space-x-3 sm:space-x-6 text-sm">
+              <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                <Icon name="Award" className="w-4 h-4 text-amber-400" />
+                <span className="text-slate-400 font-medium">Score:</span>
+                <span className="font-bold text-amber-400">{score}</span>
+              </div>
+
+              <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                <Icon name="Sparkles" className="w-4 h-4 text-orange-400" />
+                <span className="text-slate-400 font-medium">Streak:</span>
+                <span className="font-bold text-orange-400">{streak}</span>
+              </div>
+
+              <button
+                onClick={() => setShowReference(true)}
+                className="flex items-center space-x-1.5 bg-amber-600/80 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg font-medium transition text-xs sm:text-sm shadow-sm"
+              >
+                <Icon name="BookOpen" className="w-4 h-4" />
+                <span className="hidden sm:inline">Formula Reference</span>
+              </button>
+
+              <button
+                onClick={() => setShowCalculator(!showCalculator)}
+                className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg font-medium border border-slate-700 transition text-xs sm:text-sm"
+              >
+                <Icon name="Calculator" className="w-4 h-4 text-sky-400" />
+                <span className="hidden sm:inline">Scratchpad</span>
+              </button>
+            </div>
+          </header>
+
+          {/* MAIN CONTAINER */}
+          <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
+            
+            {/* ACTION & MODE SWITCH BAR */}
+            <div className="flex flex-wrap items-center justify-between bg-slate-800/50 border border-slate-800 rounded-2xl p-4 gap-4">
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Mode:</span>
+                <div className="inline-flex bg-slate-900 p-1 rounded-xl border border-slate-700">
+                  <button
+                    onClick={() => {
+                      setAppMode('problem');
+                      setAnswerResult(null);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
+                      appMode === 'problem'
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Direct Answer
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAppMode('support');
+                      setAnswerResult(null);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
+                      appMode === 'support'
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Guided Step-by-Step
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <span className="text-xs text-slate-400 hidden md:inline">
+                  Problems Solved: <span className="font-bold text-slate-200">{completedCount}</span>
+                </span>
+                <button
+                  onClick={loadNewProblem}
+                  className="flex items-center space-x-2 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shadow"
+                >
+                  <Icon name="RefreshCw" className="w-4 h-4" />
+                  <span>Next Problem</span>
+                </button>
+              </div>
+            </div>
+
+            {/* AUTO REDIRECT ALERT MESSAGE */}
+            {autoRedirectMessage && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start space-x-3 text-amber-300 text-sm animate-fadeIn">
+                <Icon name="Info" className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-400" />
+                <div>
+                  <p className="font-semibold">Let's walk through this step-by-step!</p>
+                  <p className="text-amber-300/80 text-xs sm:text-sm mt-0.5">
+                    We've switched to Guided Mode to help identify given variables, rearrange $E = m\cdot c\cdot \Delta T$, and isolate your target answer.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* PROBLEM CARD */}
+            <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 sm:p-7 shadow-xl backdrop-blur relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
+              
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider">
+                    Calorimetry Problem
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">ID: #{problem.id.toString().slice(-4)}</span>
+                </div>
+
+                <div className="flex items-center space-x-2 text-xs font-semibold text-slate-400">
+                  <Icon name="Tag" className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Target Unit: <span className="text-amber-300 font-bold">{problem.targetUnit}</span></span>
+                </div>
+              </div>
+
+              <p className="text-base sm:text-lg leading-relaxed font-medium text-slate-100">
+                <FormattedText text={problem.text} />
+              </p>
+            </div>
+
+            {/* DIRECT ANSWER PANEL */}
+            {appMode === 'problem' && (
+              <div className="bg-slate-800/40 border border-slate-800 rounded-2xl p-6 shadow-lg animate-fadeIn flex flex-col gap-5">
+                <h3 className="text-base font-semibold text-slate-200 flex items-center space-x-2">
+                  <Icon name="Zap" className="w-5 h-5 text-amber-400" />
+                  <span>Direct Answer Entry</span>
+                </h3>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                  <div className="flex-1 relative">
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder={`Enter calculated value (to 3 sig figs)...`}
+                      value={userAnswer}
+                      onChange={(e) => setUserAnswer(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleVerifyAnswer()}
+                      className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-xl px-4 py-3 font-mono text-lg text-white placeholder-slate-500 outline-none transition"
+                    />
+                    <span className="absolute right-4 top-3.5 text-slate-400 font-mono text-sm font-semibold">
+                      {problem.targetUnit}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={handleVerifyAnswer}
+                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-3 rounded-xl transition shadow-lg shadow-amber-500/20 flex items-center justify-center space-x-2"
+                  >
+                    <span>Submit Answer</span>
+                    <Icon name="ArrowRight" className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {answerResult && (
+                  <div
+                    className={`p-4 rounded-xl border flex items-start space-x-3 text-sm animate-fadeIn ${
+                      answerResult.correct
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                        : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                    }`}
+                  >
+                    <Icon
+                      name={answerResult.correct ? 'CheckCircle2' : 'XCircle'}
+                      className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                        answerResult.correct ? 'text-emerald-400' : 'text-rose-400'
+                      }`}
+                    />
+                    <div>
+                      <p className="font-semibold">{answerResult.msg}</p>
+                      {answerResult.correct ? (
+                        <button
+                          onClick={loadNewProblem}
+                          className="mt-3 inline-flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition"
+                        >
+                          <span>Try Next Problem</span>
+                          <Icon name="ChevronRight" className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setAppMode('support');
+                            setCurrentStep(1);
+                            setAutoRedirectMessage(true);
+                          }}
+                          className="mt-3 inline-flex items-center space-x-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold px-3 py-1.5 rounded-lg transition"
+                        >
+                          <span>Switch to Guided Mode for Help</span>
+                          <Icon name="ChevronRight" className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* GUIDED SUPPORT MODE STEP-BY-STEP */}
+            {appMode === 'support' && (
+              <div className="flex flex-col gap-6 animate-fadeIn">
+                
+                {/* STEP PROGRESS BAR */}
+                <div className="grid grid-cols-4 gap-2 sm:gap-4">
+                  {[
+                    { num: 1, title: "Identify Givens & Target" },
+                    { num: 2, title: "Select Isolated Formula" },
+                    { num: 3, title: "Substitute Values" },
+                    { num: 4, title: "Calculate Result" }
+                  ].map((s) => {
+                    const active = currentStep === s.num;
+                    const done = currentStep > s.num;
+                    return (
+                      <div
+                        key={s.num}
+                        className={`border rounded-xl p-3 flex flex-col items-center sm:items-start transition ${
+                          active
+                            ? 'bg-amber-500/10 border-amber-500 text-white'
+                            : done
+                            ? 'bg-slate-800/40 border-slate-700/60 text-slate-400'
+                            : 'bg-slate-900/40 border-slate-800 text-slate-600'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <span
+                            className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                              done
+                                ? 'bg-emerald-500 text-slate-950'
+                                : active
+                                ? 'bg-amber-500 text-slate-950'
+                                : 'bg-slate-800 text-slate-500'
+                            }`}
+                          >
+                            {done ? <Icon name="Check" className="w-3 h-3 stroke-[3]" /> : s.num}
+                          </span>
+                          <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">
+                            Step {s.num}
+                          </span>
+                        </div>
+                        <span className="text-xs font-medium mt-1 truncate w-full text-center sm:text-left">
+                          {s.title}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* STEP 1: VARIABLE MAPPING */}
+                {currentStep === 1 && (
+                  <div className="bg-slate-800/50 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col gap-6 animate-fadeIn">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-100 flex items-center space-x-2">
+                        <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs">1</span>
+                        <span>Map Measurements to Symbols & Select Target Variable</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Assign each given measurement to its variable symbol: Energy ($E$ in J), Mass ($m$ in g), Specific Heat ($c$), Temperature (<FormattedText text="T_i, T_f, ΔT" />).
+                      </p>
+                    </div>
+
+                    {/* GIVENS MAPPING GRID */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {problem.givens.map((item) => (
+                        <div
+                          key={item.id}
+                          className="bg-slate-900/80 border border-slate-700/80 rounded-xl p-4 flex flex-col gap-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-base font-bold text-amber-300 bg-amber-950/50 border border-amber-800/50 px-2.5 py-1 rounded-lg">
+                              <FormattedText text={item.label} />
+                            </span>
+                            <span className="text-xs text-slate-400">Assign Symbol:</span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1.5">
+                            {ALL_VARS.map((v) => (
+                              <button
+                                key={v}
+                                onClick={() =>
+                                  setUserAssignments((prev) => ({
+                                    ...prev,
+                                    [item.id]: prev[item.id] === v ? undefined : v
+                                  }))
+                                }
+                                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition ${
+                                  userAssignments[item.id] === v
+                                    ? 'bg-amber-500 text-slate-950 shadow-md font-bold'
+                                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                                }`}
+                              >
+                                <FormattedText text={v} />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* TARGET VARIABLE SELECTION */}
+                    <div className="bg-slate-900/60 border border-slate-700/80 rounded-xl p-4 flex flex-col gap-3">
+                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                        Select Unknown Target Variable (?):
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {ALL_VARS.map((v) => (
+                          <button
+                            key={v}
+                            onClick={() => setUserTargetVar(userTargetVar === v ? '' : v)}
+                            className={`px-4 py-2 rounded-xl text-sm font-mono font-bold transition ${
+                              userTargetVar === v
+                                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                            }`}
+                          >
+                            <FormattedText text={v} /> = ?
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {step1Error && (
+                      <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs sm:text-sm flex items-center space-x-2">
+                        <Icon name="XCircle" className="w-4 h-4 flex-shrink-0 text-rose-400" />
+                        <span><FormattedText text={step1Error} /></span>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleVerifyStep1}
+                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 px-6 rounded-xl transition shadow-lg shadow-amber-500/20 flex items-center justify-center space-x-2 self-end"
+                    >
+                      <span>Verify Setup & Proceed</span>
+                      <Icon name="ArrowRight" className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* STEP 2: FORMULA SELECTION */}
+                {currentStep === 2 && (
+                  <div className="bg-slate-800/50 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col gap-6 animate-fadeIn">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-100 flex items-center space-x-2">
+                        <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs">2</span>
+                        <span>Select the Rearranged Formula</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Choose the formula that isolates variable <strong><FormattedText text={activeTarget} /></strong>.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {[
+                        { key: 'E', label: 'Energy (E)', num: 'm × c × ΔT', den: '' },
+                        { key: 'm', label: 'Mass (m)', num: 'E', den: 'c × ΔT' },
+                        { key: 'c', label: 'Specific Heat (c)', num: 'E', den: 'm × ΔT' },
+                        { key: 'ΔT', label: 'Temp Change (ΔT)', num: 'E', den: 'm × c' },
+                        { key: 'T_f', label: 'Final Temp (T_f)', num: 'T_i + (E / (m × c))', den: '' }
+                      ].map((f) => (
+                        <button
+                          key={f.key}
+                          onClick={() => setSelectedFormula(f.key)}
+                          className={`text-left p-4 rounded-xl border transition flex flex-col justify-between ${
+                            selectedFormula === f.key
+                              ? 'bg-amber-500/20 border-amber-500 shadow-md shadow-amber-500/10'
+                              : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="font-bold text-slate-100"><FormattedText text={f.label} /></span>
+                            <span
+                              className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                                selectedFormula === f.key
+                                  ? 'border-amber-400 bg-amber-500 text-slate-950'
+                                  : 'border-slate-600'
+                              }`}
+                            >
+                              {selectedFormula === f.key && <Icon name="Check" className="w-3 h-3 stroke-[3]" />}
+                            </span>
+                          </div>
+                          <div className="py-2">
+                            <FractionExpr lhs={f.key} num={f.num} den={f.den} className="text-amber-300 text-base" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {step2Error && (
+                      <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs sm:text-sm flex items-center space-x-2">
+                        <Icon name="XCircle" className="w-4 h-4 flex-shrink-0 text-rose-400" />
+                        <span>{step2Error}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center pt-2">
+                      <button
+                        onClick={() => setCurrentStep(1)}
+                        className="text-xs font-semibold text-slate-400 hover:text-slate-200"
+                      >
+                        ← Back to Step 1
+                      </button>
+                      <button
+                        onClick={handleVerifyStep2}
+                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 px-6 rounded-xl transition shadow-lg shadow-amber-500/20 flex items-center space-x-2"
+                      >
+                        <span>Confirm Formula & Proceed</span>
+                        <Icon name="ArrowRight" className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 3: SUBSTITUTION */}
+                {currentStep === 3 && (
+                  <div className="bg-slate-800/50 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col gap-6 animate-fadeIn">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-100 flex items-center space-x-2">
+                        <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs">3</span>
+                        <span>Value Substitution</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Plug in the given numbers into your isolated formula for <strong>{activeTarget}</strong>.
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center gap-6">
+                      <div className="text-center">
+                        <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-2">
+                          1. Isolated Formula:
+                        </span>
+                        <FractionExpr
+                          lhs={activeTarget}
+                          num={isolatedParts.num}
+                          den={isolatedParts.den}
+                          className="text-lg sm:text-xl text-sky-400"
+                        />
+                      </div>
+
+                      <div className="w-full border-t border-slate-800/80"></div>
+
+                      <div className="text-center">
+                        <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-2">
+                          2. Substituted Values with Units:
+                        </span>
+                        <FractionExpr
+                          lhs={activeTarget}
+                          num={
+                            isolatedParts.num
+                              .replace(/\bm\b/g, getValForVar('m'))
+                              .replace(/\bc\b/g, getValForVar('c'))
+                              .replace(/\bΔT\b/g, getValForVar('ΔT'))
+                              .replace(/\bE\b/g, getValForVar('E'))
+                              .replace(/\bT_i\b/g, getValForVar('T_i'))
+                          }
+                          den={
+                            isolatedParts.den
+                              .replace(/\bm\b/g, getValForVar('m'))
+                              .replace(/\bc\b/g, getValForVar('c'))
+                              .replace(/\bΔT\b/g, getValForVar('ΔT'))
+                              .replace(/\bE\b/g, getValForVar('E'))
+                          }
+                          className="text-base sm:text-lg text-emerald-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2">
+                      <button
+                        onClick={() => setCurrentStep(2)}
+                        className="text-xs font-semibold text-slate-400 hover:text-slate-200"
+                      >
+                        ← Back to Step 2
+                      </button>
+                      <button
+                        onClick={handleConfirmStep3}
+                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 px-6 rounded-xl transition shadow-lg shadow-amber-500/20 flex items-center space-x-2"
+                      >
+                        <span>Proceed to Final Calculation</span>
+                        <Icon name="ArrowRight" className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 4: FINAL CALCULATION */}
+                {currentStep === 4 && (
+                  <div className="bg-slate-800/50 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col gap-6 animate-fadeIn">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-100 flex items-center space-x-2">
+                        <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs">4</span>
+                        <span>Calculate Final Value</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Compute the final numerical result (to 3 sig figs) and enter below.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                      <div className="flex-1 relative">
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="Enter calculated value..."
+                          value={userAnswer}
+                          onChange={(e) => setUserAnswer(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleVerifyAnswer()}
+                          className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-xl px-4 py-3 font-mono text-lg text-white placeholder-slate-500 outline-none transition"
+                        />
+                        <span className="absolute right-4 top-3.5 text-slate-400 font-mono text-sm font-semibold">
+                          {problem.targetUnit}
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={handleVerifyAnswer}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-3 rounded-xl transition shadow-lg shadow-emerald-600/20 flex items-center justify-center space-x-2"
+                      >
+                        <span>Check Solution</span>
+                        <Icon name="CheckCircle2" className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {answerResult && (
+                      <div
+                        className={`p-4 rounded-xl border flex items-start space-x-3 text-sm animate-fadeIn ${
+                          answerResult.correct
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                            : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                        }`}
+                      >
+                        <Icon
+                          name={answerResult.correct ? 'CheckCircle2' : 'XCircle'}
+                          className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                            answerResult.correct ? 'text-emerald-400' : 'text-rose-400'
+                          }`}
+                        />
+                        <div>
+                          <p className="font-semibold">{answerResult.msg}</p>
+                          {answerResult.correct && (
+                            <button
+                              onClick={loadNewProblem}
+                              className="mt-3 inline-flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition"
+                            >
+                              <span>Try Next Problem</span>
+                              <Icon name="ChevronRight" className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </main>
+
+          {/* FORMULA REFERENCE SHEET MODAL */}
+          {showReference && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl p-6 flex flex-col gap-6">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div className="flex items-center space-x-2.5">
+                    <Icon name="BookOpen" className="w-5 h-5 text-amber-400" />
+                    <h3 className="text-lg font-bold text-white">Calorimetry (E = m·c·ΔT) Cheat Sheet</h3>
+                  </div>
+                  <button
+                    onClick={() => setShowReference(false)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                  >
+                    <Icon name="X" className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col gap-3 text-xs">
+                    <span className="font-bold text-amber-400 text-sm">Main Calorimetry Equations</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-slate-200">
+                      <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 text-center">
+                        <span className="text-amber-400 font-bold block mb-1">Energy (E)</span>
+                        E = m × c × ΔT
+                      </div>
+                      <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 text-center">
+                        <span className="text-amber-400 font-bold block mb-1">Mass (m)</span>
+                        m = E / (c × ΔT)
+                      </div>
+                      <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 text-center">
+                        <span className="text-amber-400 font-bold block mb-1">Specific Heat (c)</span>
+                        c = E / (m × ΔT)
+                      </div>
+                      <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 text-center">
+                        <span className="text-amber-400 font-bold block mb-1">Temp Change (ΔT)</span>
+                        ΔT = E / (m × c)
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col gap-2 text-xs">
+                    <span className="font-bold text-sky-400 uppercase tracking-wider">Temperature Relations</span>
+                    <ul className="list-disc list-inside text-slate-300 space-y-1">
+                      <li><strong>Temperature Change:</strong> <FormattedText text="ΔT = T_f - T_i" /></li>
+                      <li><strong>Final Temperature:</strong> <FormattedText text="T_f = T_i + ΔT" /> (for heat absorption)</li>
+                      <li><strong>Consistent Units:</strong> Standard temperature unit in each problem set remains consistent (°C or K).</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col gap-2">
+                    <span className="font-bold text-emerald-400 uppercase tracking-wider text-xs">Common Specific Heat Capacities (c)</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono text-slate-300 mt-1">
+                      {MATERIALS.map(m => (
+                        <div key={m.name} className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                          <span className="text-slate-400 block text-[11px]">{m.name}:</span>
+                          <span className="text-emerald-300 font-bold">{m.c} J/(g·°C)</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowReference(false)}
+                  className="bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2.5 rounded-xl transition text-sm self-end px-6"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* SCRATCHPAD MODAL */}
+          {showCalculator && (
+            <div className="fixed bottom-6 right-6 z-40 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 w-80 animate-fadeIn">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+                <div className="flex items-center space-x-2">
+                  <Icon name="Calculator" className="w-4 h-4 text-sky-400" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                    E = m·c·ΔT Scratchpad
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowCalculator(false)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <Icon name="X" className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-2.5 text-xs">
+                <div>
+                  <label className="text-slate-400 block mb-1">Mass m (g):</label>
+                  <input
+                    type="number"
+                    placeholder="g"
+                    value={calcMass}
+                    onChange={(e) => {
+                      const mVal = e.target.value;
+                      setCalcMass(mVal);
+                      if (mVal && calcC && calcDT) {
+                        setCalcE(toSigFigs(parseFloat(mVal) * parseFloat(calcC) * parseFloat(calcDT), 3));
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-white outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-slate-400 block mb-1">Specific Heat c:</label>
+                    <input
+                      type="number"
+                      placeholder="J/(g·°C)"
+                      value={calcC}
+                      onChange={(e) => {
+                        const cV = e.target.value;
+                        setCalcC(cV);
+                        if (calcMass && cV && calcDT) {
+                          setCalcE(toSigFigs(parseFloat(calcMass) * parseFloat(cV) * parseFloat(calcDT), 3));
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-white outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-slate-400 block mb-1">Temp Change ΔT:</label>
+                    <input
+                      type="number"
+                      placeholder="°C or K"
+                      value={calcDT}
+                      onChange={(e) => {
+                        const dtV = e.target.value;
+                        setCalcDT(dtV);
+                        if (calcMass && calcC && dtV) {
+                          setCalcE(toSigFigs(parseFloat(calcMass) * parseFloat(calcC) * parseFloat(dtV), 3));
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-white outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-800 pt-2 flex items-center justify-between">
+                  <span className="text-slate-400 font-semibold">Energy E (J):</span>
+                  <span className="font-mono text-base font-bold text-amber-400">
+                    {calcE ? `${calcE} J` : '—'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* FOOTER */}
+          <footer className="border-t border-slate-800 py-4 px-6 text-center text-xs text-slate-500 mt-auto">
+            Calorimetry Practice Master (E = m·c·ΔT) &bull; Interactive Science Learning Tool
+          </footer>
+        </div>
+      );
+    }
+
+    const rootElement = document.getElementById('root');
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(<App />);
+  </script>
+</body>
+</html>
